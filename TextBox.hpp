@@ -4,7 +4,13 @@
 #include "SFML/Graphics.hpp"
 #include <vector>
 #include <iostream>
-
+
+/*---------------todo---------------*\
+*		 	scrollbars	   	  *
+* 		  text selection 		  *
+*   change color to specified text   *
+\*----------------------------------*/
+
 class TextBox
 {
 	public:
@@ -15,6 +21,7 @@ class TextBox
 			view.reset(sf::FloatRect(0, 0, w, h));
 			view.setViewport(sf::FloatRect(left / win->getSize().x, top / win->getSize().y, 
 				(width) / win->getSize().x, (height) / win->getSize().y));
+			focus = false;
 			
 			multiple_lines = false;
 			px = 0;
@@ -31,6 +38,31 @@ class TextBox
 		}
 		void listen(sf::Event& e)
 		{
+			if(e.type == sf::Event::MouseButtonPressed && e.mouseButton.button == sf::Mouse::Left)
+			{
+				focus = false;
+				if(e.mouseButton.x > x && e.mouseButton.x < (x+w))
+					focus = true;
+				if(focus = false) return;
+				
+				sf::Vector2i mouse = getMousePos();
+				
+				//getting line y pos
+				if((mouse.y / line_height) >= (int)text.size()) py = text.size() - 1;
+				else py = mouse.y / line_height;
+				//getting line x pos
+				toDraw.setString(text[py]);
+				for(int i = text[py].getSize() - 1; i >= 0; i--)
+				{
+					if(mouse.x >= toDraw.findCharacterPos(i).x)
+					{
+						px = i;
+						break;
+					}
+				}
+				//update bar pos
+				bar.setPosition({toDraw.findCharacterPos(px).x, py*line_height});
+			}
 			if(e.type == sf::Event::KeyPressed)
 			{
 				if(e.key.code == sf::Keyboard::Delete)
@@ -188,6 +220,7 @@ class TextBox
 		sf::RenderWindow* win;
 		sf::View view;
 		float x, y, w, h;
+		bool focus;
 		/*----------Functions----------*/
 		void singleLinesRender()
 		{
@@ -206,6 +239,17 @@ class TextBox
 				toDraw.setPosition(0, i*line_height);
 				win->draw(toDraw);
 			}
+		}
+		sf::Vector2i getMousePos()
+		{
+			sf::Vector2i vv = sf::Mouse::getPosition(*win);
+
+			sf::Vector2f v2f(view.getCenter().x - view.getSize().x / 2, view.getCenter().y - view.getSize().y / 2);
+
+			vv.x = (vv.x - x) * (view.getSize().x / w) + v2f.x;
+			vv.y = (vv.y - y) * (view.getSize().y / h) + v2f.y;
+
+			return vv;
 		}
 		void adjustView()
 		{
