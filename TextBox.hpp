@@ -1,6 +1,6 @@
 #ifndef TEXTBOX_HPP
 #define TEXTBOX_HPP
-
+
 #include "SFML/Graphics.hpp"
 #include <vector>
 #include <iostream>
@@ -20,14 +20,20 @@ class TextBox
 			x = left; y = top; w = width; h = height;
 			view.reset(sf::FloatRect(0, 0, w, h));
 			view.setViewport(sf::FloatRect(left / win->getSize().x, top / win->getSize().y, 
-				(width) / win->getSize().x, (height) / win->getSize().y));
+										   width / win->getSize().x, height / win->getSize().y));
 			focus = false;
+			background.setSize({width, height});
+			background.setPosition({0.f, 0.f});
+			background.setFillColor(sf::Color::Blue);
 			
 			multiple_lines = false;
 			px = 0;
 			py = 0;
 			text.push_back("");
-			
+			select_begin = {-1, -1};
+			select_end = {-1, -1};
+			selecting = false;
+			
 			toDraw.setFillColor(sf::Color::Black);
 			line_height = toDraw.getCharacterSize() + 10;
 			max_width = 0;
@@ -38,35 +44,54 @@ class TextBox
 		}
 		void listen(sf::Event& e)
 		{
+			if(e.type == sf::Event::Resized)
+			{
+				view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y, 
+					w / win->getSize().x, h / win->getSize().y));
+				adjustView();
+			}
 			if(e.type == sf::Event::MouseButtonPressed && e.mouseButton.button == sf::Mouse::Left)
 			{
 				focus = false;
 				if(e.mouseButton.x > x && e.mouseButton.x < (x+w))
 					focus = true;
-				if(focus = false) return;
+				if(!focus) return;
 				
-				sf::Vector2i mouse = getMousePos();
+				sf::Vector2i pos = getTextPos(getMousePos());
+				px = pos.x;
+				py = pos.y;
 				
-				//getting line y pos
-				if((mouse.y / line_height) >= (int)text.size()) py = text.size() - 1;
-				else py = mouse.y / line_height;
-				//getting line x pos
-				toDraw.setString(text[py]);
-				for(int i = text[py].getSize() - 1; i >= 0; i--)
-				{
-					if(mouse.x >= toDraw.findCharacterPos(i).x)
-					{
-						px = i;
-						break;
-					}
-				}
 				//update bar pos
 				bar.setPosition({toDraw.findCharacterPos(px).x, py*line_height});
+				
+				selecting = true;
+				select_begin.x = px;
+				select_begin.y = py;
+				select_end.x = -1;
+				select_end.y = -1;
+			}
+			if(e.type == sf::Event::MouseButtonReleased && e.mouseButton.button == sf::Mouse::Left)
+			{
+				selecting = false;
+			}
+			if(selecting && e.type == sf::Event::MouseMoved)
+			{
+				select_end = getTextPos(getMousePos());
+				std::cout << select_end.x << " " << select_end.y << "\n";
 			}
 			if(e.type == sf::Event::KeyPressed)
 			{
 				if(e.key.code == sf::Keyboard::Delete)
 				{
+					if(px < (int)text[py].getSize())
+					{
+						text[py].erase(px);
+					}
+					else if(py < (int)(text.size() - 1))
+					{
+						text[py] += text[py+1];
+						text.erase(text.begin() + py + 1);
+					}
 					adjustView();
 					return;
 				}
@@ -83,7 +108,7 @@ class TextBox
 				}
 				if(e.key.code == sf::Keyboard::Down)
 				{
-					if(py < text.size() - 1)
+					if(py < (int)(text.size() - 1))
 					{
 						py++;
 						if(px > (int)text[py].getSize())
@@ -168,9 +193,19 @@ class TextBox
 			sf::View temp = win->getView();
 			win->setView(view);
 			
+			//draw background
+			win->draw(background);
+			
+			//draw selected text
+			if(begin.x != -1) drawSelected();
+			
+			//draw text
 			if(multiple_lines) multiLinesRender();
 			else singleLinesRender();
 			win->draw(bar);
+			
+			//draw scrollbars
+			
 			
 			win->setView(temp);
 		}
@@ -189,6 +224,18 @@ class TextBox
 			
 			adjustView();
 		}
+		void setSize(sf::Vector2f size)
+		{
+			w = size.x;
+			h = size.y;
+			background.setSize({w, h});
+			
+			view.reset({0, 0, w, h});
+			view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y, 
+			   w / win->getSize().x, h / win->getSize().y));
+
+			adjustView();
+		}
 		void write(sf::String toWrite)
 		{
 			return;
@@ -203,12 +250,14 @@ class TextBox
 		bool multiple_lines;
 		std::vector<sf::String> text;
 		int px, py;
-		int select_begin, select_end;
+		sf::Vector2i select_begin, select_end;
+		bool selecting;
 		
 		//text render
 		sf::Font font;
 		sf::Text toDraw;
 		float line_height, max_width;
+		sf::RectangleShape select_highlight;
 		
 		//scrollbars
 		//to implement
@@ -221,6 +270,7 @@ class TextBox
 		sf::View view;
 		float x, y, w, h;
 		bool focus;
+		sf::RectangleShape background;
 		/*----------Functions----------*/
 		void singleLinesRender()
 		{
@@ -240,6 +290,10 @@ class TextBox
 				win->draw(toDraw);
 			}
 		}
+		void drawSelected()
+		{
+			
+		}
 		sf::Vector2i getMousePos()
 		{
 			sf::Vector2i vv = sf::Mouse::getPosition(*win);
@@ -250,6 +304,30 @@ class TextBox
 			vv.y = (vv.y - y) * (view.getSize().y / h) + v2f.y;
 
 			return vv;
+		}
+		sf::Vector2i getTextPos(sf::Vector2i mouse)
+		{
+			//pos to return
+			sf::Vector2i pos;
+			
+			//getting line y pos
+			if((mouse.y / line_height) >= text.size())
+				pos.y = text.size() - 1;
+			else
+				pos.y = mouse.y / line_height;
+			
+			//getting line x pos
+			toDraw.setString(text[pos.y]);
+			for(int i = text[pos.y].getSize(); i >= 0; i--)
+			{
+				if(mouse.x >= toDraw.findCharacterPos(i).x)
+				{
+					pos.x = i;
+					break;
+				}
+			}
+			
+			return pos;
 		}
 		void adjustView()
 		{
@@ -279,7 +357,7 @@ class TextBox
 			}
 			if(width > (view.getCenter().x + w*0.5f))						 //scroll right
 			{
-				view.move({width - view.getCenter().x - w*0.5 + bar.getSize().x, 0});
+				view.move({width - view.getCenter().x - w*0.5f + bar.getSize().x, 0.f});
 			}
 			if(width < (view.getCenter().x - w*0.5f))						 //scroll left
 			{
@@ -288,14 +366,6 @@ class TextBox
 			
 			//check height
 			float height = (py+1) * line_height;
-			if(height > h && height < (view.getCenter().y + h*0.5f))	//wrap
-			{
-				view.setCenter({view.getCenter().x, height - h*0.5f});
-			}
-			else if(height < h)									 	//check if height less than view height, then adjust 
-			{
-				view.setCenter({view.getCenter().x, h*0.5f});
-			}
 			if(height > (view.getCenter().y + h*0.5f))				  //scroll down
 			{
 				view.move({0, height - (view.getCenter().y + h*0.5f)});
@@ -307,6 +377,9 @@ class TextBox
 			
 			//update bar position
 			bar.setPosition({width, py*line_height});
+			
+			//update background pos
+			background.setPosition({view.getCenter().x - w*0.5f, view.getCenter().y - h*0.5f});
 		}
 };
 #endif
