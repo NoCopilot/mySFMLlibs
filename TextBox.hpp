@@ -9,7 +9,7 @@
 #ifdef UNIX
 #define newline "\n"
 #else
-#define newline "\n\r"
+#define newline "\r\n"
 #endif
 
 //todo: add line numbers (to try: add another view for numbers)
@@ -131,6 +131,8 @@ public:
 			}
 			scrollX.update(max_width);
 			scrollY.update(line_height * text.size());
+			//update background pos
+			background.setPosition({ view.getCenter().x - w * 0.5f, view.getCenter().y - h * 0.5f });
 		}
 		if (e.type == sf::Event::KeyPressed)
 		{
@@ -486,7 +488,7 @@ private:
 			float xpos = 0;
 			for (sf::String str : temp)
 			{
-				if ((char)str[0] == '"')
+				if ((char)str[0] == '"' || (char)str[0] == '\'')
 				{
 					toDraw.setFillColor(sf::Color(53, 127, 53));
 				}
@@ -753,13 +755,13 @@ private:
 	{
 		std::vector<sf::String> res;
 		sf::String s = "";
-		for (char ch : str)
+		for (int i = 0; i < str.getSize(); i++)
 		{
-			if (ch == del) {
+			if ((char)str[i] == del) {
 				res.push_back(s);
 				s = "";
 			}
-			else s += ch;
+			else s += str[i];
 		}
 		res.push_back(s);
 		return res;
@@ -773,7 +775,7 @@ private:
 		{
 			if ((char)s[i] == '"' || (char)s[i] == '\'')
 			{
-				char ch = s[i];
+				char ch = (char)s[i];
 				v.push_back(str);
 				int j;
 				for (j = i + 1; j < (int)s.getSize(); j++)
