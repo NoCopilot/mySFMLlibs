@@ -59,7 +59,7 @@ class Button
 
 			btn.setSize(sf::Vector2f(img.getGlobalBounds().width + padding.x * 2, img.getGlobalBounds().height + padding.y * 2));
 		}
-		void draw()
+		void draw(sf::RenderWindow* win)
 		{
 			win->draw(btn);
 			win->draw(img);

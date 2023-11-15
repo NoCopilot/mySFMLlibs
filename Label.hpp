@@ -6,7 +6,7 @@
 class Label
 {
 public:
-	Label(){}
+	inline Label(){}
 	Label(sf::String str, int size, sf::Color color, sf::String ffont)
 	{
 		font.loadFromFile(ffont);
@@ -26,29 +26,37 @@ public:
 		text.setFont(font);
 		text.setFillColor(color);
 	}
-	void draw(sf::RenderWindow& win)
+	inline void draw(sf::RenderWindow* win)
 	{
-		win.draw(text);
+		win->draw(text);
 	}
-	void setPos(sf::Vector2f pos)
+	inline void setPos(sf::Vector2f pos)
 	{
 		text.setPosition(pos);
 	}
-	sf::Vector2f getSize()
-	{
-		return sf::Vector2f(text.getGlobalBounds().width, text.getGlobalBounds().height);
-	}
-	sf::Vector2f getPos()
+	inline sf::Vector2f getPos()
 	{
 		return text.getPosition();
 	}
-	void setText(sf::String str)
+	inline void setText(sf::String str)
 	{
 		text.setString(str);
 	}
-	void setFont(sf::String ffont)
+	inline void setFont(sf::String ffont)
 	{
 		font.loadFromFile(ffont);
+	}
+	inline void setChSize(int n)
+	{
+		text.setCharacterSize(n);
+	}
+	inline void setColor(sf::Color color)
+	{
+		text.setFillColor(color);
+	}
+	inline sf::Vector2f getSize()
+	{
+		return sf::Vector2f(text.getGlobalBounds().width, text.getGlobalBounds().height);
 	}
 private:
 	sf::Text text;
