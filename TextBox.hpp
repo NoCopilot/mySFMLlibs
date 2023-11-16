@@ -338,6 +338,10 @@ public:
 	{
 		special.push_back({ v, c });
 	}
+	void loadDelimKeys(sf::Uint8 begin, sf::Uint8 end, sf::Color color)
+	{
+		delimitator.push_back({begin, end, color});
+	}
 	void setFocus()
 	{
 		focus = true;
@@ -390,10 +394,24 @@ public:
 	{
 		bar.setFillColor(color);
 	}
+	void setScrollBarSize(float n)
+	{
+		w = w + scrollBarSize - n;
+		h = h + scrollBarSize - n;
+		scrollBarSize = n;
+
+		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y,
+			w / win->getSize().x, h / win->getSize().y));
+
+		scrollX.setSize({ w, scrollBarSize });
+		scrollY.setSize({ scrollBarSize, h });
+
+		scrollX.setPos({ x, y + h });
+		scrollY.setPos({ x + w, y });
+	}
 	void setPos(sf::Vector2f newpos)
 	{
 		x = newpos.x; y = newpos.y;
-		view.reset(sf::FloatRect(view.getCenter().x - w*0.5f, view.getCenter().y - h * 0.5f, w, h));
 		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y,
 			w / win->getSize().x, h / win->getSize().y));
 
@@ -462,7 +480,13 @@ private:
 		std::vector<sf::String> specialKeys;
 		sf::Color color;
 	};
+	struct delim
+	{
+		sf::Uint8 begin, end;
+		sf::Color color;
+	};
 	std::vector<keys> special;
+	std::vector<delim> delimitator;
 	sf::Clock clock;
 
 	//text render
@@ -503,11 +527,17 @@ private:
 			float xpos = 0;
 			for (sf::String str : temp)
 			{
-				if ((char)str[0] == '"' || (char)str[0] == '\'')
+				bool delimfound = false;
+				for (int j = 0; j < delimitator.size(); ++j)
 				{
-					toDraw.setFillColor(sf::Color(53, 127, 53));
+					if (str[0] == delimitator[j].begin)
+					{
+						delimfound = true;
+						toDraw.setFillColor(delimitator[j].color);
+						break;
+					}
 				}
-				else for (int j = 0; j < special.size(); j++)
+				if(!delimfound)for (int j = 0; j < special.size(); j++)
 				{
 					bool b = false;
 					for (sf::String s : special[j].specialKeys)
@@ -788,24 +818,32 @@ private:
 		sf::String str = "";
 		for (int i = 0; i < (int)s.getSize(); i++)
 		{
-			if ((char)s[i] == '"' || (char)s[i] == '\'')
+			bool checkdelimfound = false;
+			for (int j = 0; j < delimitator.size(); j++)
 			{
-				char ch = (char)s[i];
-				v.push_back(str);
-				int j;
-				for (j = i + 1; j < (int)s.getSize(); j++)
+				if (s[i] == delimitator[j].begin)
 				{
-					if ((char)s[j] == ch) {
-						j++;
-						break;
+					wchar_t ch = delimitator[j].end;
+					v.push_back(str);
+
+					for (j = i + 1; j < (int)s.getSize(); j++)
+					{
+						if (s[j] == ch) {
+							j++;
+							break;
+						}
 					}
+					str = s.substring(i, j - i);
+					v.push_back(str);
+					str = "";
+					i = j - 1;
+					checkdelimfound = true;
+					break;
 				}
-				str = s.substring(i, j - i);
-				v.push_back(str);
-				str = "";
-				i = j - 1;
-				continue;
 			}
+			
+			if (checkdelimfound) continue;
+			
 			if ((char)s[i] == '\t' || (char)s[i] == ' ')
 			{
 				if(str != "")v.push_back(str);

@@ -45,6 +45,7 @@ public:
 	inline void setFont(sf::String ffont)
 	{
 		font.loadFromFile(ffont);
+		text.setFont(font);
 	}
 	inline void setChSize(int n)
 	{
@@ -56,7 +57,7 @@ public:
 	}
 	inline sf::Vector2f getSize()
 	{
-		return sf::Vector2f(text.getGlobalBounds().width, text.getGlobalBounds().height);
+		return sf::Vector2f(text.getLocalBounds().width, text.getLocalBounds().height);
 	}
 private:
 	sf::Text text;
