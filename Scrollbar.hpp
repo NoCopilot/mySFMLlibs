@@ -128,9 +128,9 @@ class Scrollbar
 	private:
 		sf::View* view;
 		sf::RectangleShape base, movable;
-		float max;
-		bool horizontal, mousePressing = false;
-		sf::Vector2i mouse;
+		float max = 0;
+		bool horizontal = false, mousePressing = false;
+		sf::Vector2i mouse = { 0, 0 };
 		
 		void checkPos()
 		{

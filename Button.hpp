@@ -72,9 +72,9 @@ class Button
 				sf::Vector2i pos;
 				pos.x = e.mouseButton.x;
 				pos.y = e.mouseButton.y;
-				if (pos.x > btn.getPosition().x && pos.x < btn.getPosition().x + btn.getSize().x)
+				if (pos.x >= btn.getPosition().x && pos.x <= btn.getPosition().x + btn.getSize().x)
 				{
-					if (pos.y > btn.getPosition().y && pos.y < btn.getPosition().y + btn.getSize().y)
+					if (pos.y >= btn.getPosition().y && pos.y <= btn.getPosition().y + btn.getSize().y)
 					{
 						fun();
 					}

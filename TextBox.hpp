@@ -44,7 +44,7 @@ public:
 		selecting = false;
 		select_highlight.setFillColor(sf::Color(0, 100, 230));
 		toDraw.setFillColor(sf::Color::Black);
-		line_height = toDraw.getCharacterSize() + 10;
+		line_height = toDraw.getCharacterSize() + 10.f;
 		max_width = 0;
 
 		bar.setFillColor(sf::Color::Black);
@@ -67,11 +67,18 @@ public:
 				w / win->getSize().x, h / win->getSize().y));
 			adjustView();
 		}
+
+		if (lock) return;
+
 		if (e.type == sf::Event::MouseButtonPressed && e.mouseButton.button == sf::Mouse::Left)
 		{
+			lostfocus = focus;
 			focus = false;
 			if (e.mouseButton.x > x && e.mouseButton.x < (x + w) && e.mouseButton.y > y && e.mouseButton.y < (y + h))
 				focus = true;
+			if (focus != lostfocus && lostfocus)
+				lostfocus = true;
+			
 			if (!focus) return;
 
 			sf::Vector2i pos = getTextPos(getMousePos());
@@ -101,11 +108,10 @@ public:
 			if (sf::Keyboard::isKeyPressed(sf::Keyboard::LControl))
 			{
 				int n = toDraw.getCharacterSize();
-				n += e.mouseWheelScroll.delta;
-				if (n < 10 || n > 80) n -=
-					e.mouseWheelScroll.delta;
+				n += (int)e.mouseWheelScroll.delta;
+				if (n < 10 || n > 80) n -= (int)e.mouseWheelScroll.delta;
 				toDraw.setCharacterSize(n);
-				line_height = n + 10;
+				line_height = n + 10.f;
 				bar.setSize({ bar.getSize().x, line_height });
 
 				if(max_width < view.getSize().x && view.getCenter().x > view.getSize().x * 0.5f)
@@ -160,7 +166,7 @@ public:
 				{
 					py--;
 					if (px > (int)text[py].getSize())
-						px = text[py].getSize();
+						px = (int)text[py].getSize();
 				}
 				adjustView();
 				unselect();
@@ -172,7 +178,7 @@ public:
 				{
 					py++;
 					if (px > (int)text[py].getSize())
-						px = text[py].getSize();
+						px = (int)text[py].getSize();
 
 				}
 				adjustView();
@@ -185,7 +191,7 @@ public:
 				else if (py > 0)
 				{
 					py--;
-					px = text[py].getSize();
+					px = (int)text[py].getSize();
 				}
 				adjustView();
 				unselect();
@@ -253,7 +259,7 @@ public:
 					if (px > 0) text[py].erase(--px);
 					else if (py > 0)
 					{
-						px = text[py - 1].getSize();
+						px = (int)text[py - 1].getSize();
 						text[py - 1] += text[py];
 						text.erase(text.begin() + py--);
 					}
@@ -355,7 +361,7 @@ public:
 	void setChSize(unsigned short int size)
 	{
 		toDraw.setCharacterSize(size);
-		line_height = size + 10;
+		line_height = size + 10.f;
 		bar.setSize({ 3, line_height });
 		adjustView();
 	}
@@ -422,8 +428,8 @@ public:
 	{
 		if (ty == -1)
 		{
-			ty = text.size() - 1;
-			tx = text[ty].getSize();
+			ty = (int)text.size() - 1;
+			tx = (int)text[ty].getSize();
 		}
 
 		if (ty < 0 || ty >= text.size()) return;
@@ -462,17 +468,30 @@ public:
 		multiple_lines = b;
 		if (!b)setSize({w + scrollBarSize, line_height + scrollBarSize});
 	}
+	bool lostFocus()
+	{
+		if (lostfocus) 
+		{
+			lostfocus = false;
+			return true;
+		}
+		return false;
+	}
 	void showNumbers(bool b)
 	{
 		
+	}
+	void Lock(bool b)
+	{
+		lock = b;
 	}
 private:
 
 	/*----------Variables----------*/
 	//text manipulation
-	bool multiple_lines;
+	bool multiple_lines = false;
 	std::vector<sf::String> text;
-	int px, py;
+	int px = 0, py = 0;
 	sf::Vector2i select_begin, select_end;
 	bool selecting;
 	struct keys
@@ -492,7 +511,7 @@ private:
 	//text render
 	sf::Font font;
 	sf::Text toDraw;
-	float line_height, max_width;
+	float line_height = 0, max_width = 0;
 	sf::RectangleShape select_highlight;
 
 	//scrollbars
@@ -505,8 +524,8 @@ private:
 	//view and window
 	sf::RenderWindow* win;
 	sf::View view;
-	float x, y, w, h;
-	bool focus;
+	float x = 0, y = 0, w = 0, h = 0;
+	bool focus = false, lostfocus = false, lock = false;
 	sf::RectangleShape background;
 	/*----------Functions----------*/
 	void singleLinesRender()
@@ -706,9 +725,8 @@ private:
 
 		sf::Vector2f v2f(view.getCenter().x - view.getSize().x / 2, view.getCenter().y - view.getSize().y / 2);
 
-		vv.x = (vv.x - x) * (view.getSize().x / w) + v2f.x;
-		vv.y = (vv.y - y) * (view.getSize().y / h) + v2f.y;
-
+		vv.x = (int)((vv.x - x) * (view.getSize().x / w) + v2f.x);
+		vv.y = (int)((vv.y - y) * (view.getSize().y / h) + v2f.y);
 		return vv;
 	}
 	sf::Vector2i getTextPos(sf::Vector2i mouse)
@@ -720,7 +738,7 @@ private:
 		if ((mouse.y / line_height) >= text.size())
 			pos.y = text.size() - 1;
 		else
-			pos.y = mouse.y / line_height;
+			pos.y = mouse.y / (int)line_height;
 		if (pos.y < 0) pos.y = 0;
 
 		//getting line x pos
