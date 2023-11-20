@@ -5,12 +5,6 @@
 #include "Scrollbar.hpp"
 #include <vector>
 
-#ifdef UNIX
-#define newline "\n"
-#else
-#define newline "\r\n"
-#endif
-
 //todo: add line numbers (to try: add another view for numbers)
 
 class TextBox
@@ -22,8 +16,7 @@ public:
 
 		x = left; y = top; w = width - scrollBarSize; h = height - scrollBarSize;
 		view.reset(sf::FloatRect(0, 0, w, h));
-		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y,
-			w / win->getSize().x, h / win->getSize().y));
+		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y, w / win->getSize().x, h / win->getSize().y));
 
 		scrollX.setUp(view, x, y + h, w, scrollBarSize);
 		scrollY.setUp(view, x + w, y, scrollBarSize, h);
@@ -98,10 +91,7 @@ public:
 		{
 			selecting = false;
 		}
-		if (selecting && e.type == sf::Event::MouseMoved)
-		{
-			select_end = getTextPos(getMousePos());
-		}
+		/*mouse moved while selecting event is implemented in draw() function to be better looking*/
 		if (!focus) return;
 		if (multiple_lines && e.type == sf::Event::MouseWheelScrolled)
 		{
@@ -219,7 +209,7 @@ public:
 				case 24:
 				{
 					//copy
-					auto v = getSelectedText();
+					std::vector<sf::Vector3i> v = getSelectedText();
 					if (v.size() == 0) break;
 
 					sf::String toCopy = "";
@@ -268,16 +258,27 @@ public:
 				default:
 				{
 					//add character
-					deleteSelected();
-					if (e.text.unicode >= 32) text[py].insert(px++, e.text.unicode);
-					else
+					if (e.text.unicode >= 32)
 					{
-						switch (e.text.unicode)
+						deleteSelected();
+						text[py].insert(px++, e.text.unicode);
+					}
+					else switch(e.text.unicode)
+					{
+					case 9: //tab
+						deleteSelected();
+						text[py].insert(px++, e.text.unicode);
+						break;
+					case 4: //ctrl + d
+						if (select_begin.x == -1) text.insert(text.begin() + py + 1, text[py]);
+						else
 						{
-						case 9:
-							text[py].insert(px++, e.text.unicode);
-							break;
+							std::vector<sf::Vector3i> v = getSelectedText();
+							for (int i = 0; i < v.size(); i++)
+								text.insert(text.begin() + v[i].x + v.size(), text[v[i].x].substring(v[i].y, v[i].z).toAnsiString());
 						}
+						adjustView();
+						break;
 					}
 				}
 			}
@@ -289,6 +290,9 @@ public:
 	{
 		if (selecting)
 		{
+			//updating select position
+			select_end = getTextPos(getMousePos());
+			//moving view while selecting if cursor > or < window 
 			if (clock.getElapsedTime().asSeconds() > 0.03f)
 			{
 				if (sf::Mouse::getPosition(*win).y < y)
@@ -315,10 +319,11 @@ public:
 					if ((view.getCenter().x + view.getSize().x * 0.5f) > (max_width))
 						view.setCenter({ max_width - view.getSize().x * 0.5f, view.getCenter().y });
 				}
+				background.setPosition(view.getCenter().x - view.getSize().x * 0.5f, view.getCenter().y - view.getSize().y * 0.5f);
 				clock.restart();
 			}
 		}
-
+		
 		sf::View temp = win->getView();
 		win->setView(view);
 
@@ -348,7 +353,7 @@ public:
 	{
 		delimitator.push_back({begin, end, color});
 	}
-	void setFocus()
+	inline void setFocus()
 	{
 		focus = true;
 	}
@@ -369,12 +374,9 @@ public:
 	{
 		w = size.x - scrollBarSize;
 		h = size.y - scrollBarSize;
-		background.setSize({ w, h });
 
-		view.reset({ 0, 0, w, h });
-		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y,
-
-			w / win->getSize().x, h / win->getSize().y));
+		view.reset(sf::FloatRect(0, 0, w, h));
+		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y, w / win->getSize().x, h / win->getSize().y));
 
 		scrollX.setPos({ x, y + h });
 		scrollX.setSize({ w, scrollBarSize });
@@ -382,23 +384,34 @@ public:
 		scrollY.setPos({ x + w, y });
 		scrollY.setSize({ scrollBarSize, h });
 
+		background.setSize({ w, h });
 		adjustView();
 	}
-	void setBgColor(sf::Color color)
+	sf::Vector2f getSize()
+	{
+		sf::Vector2f v = { w, h + scrollBarSize };
+		if (multiple_lines) w += scrollBarSize;
+		return v;
+	}
+	inline void setBgColor(sf::Color color)
 	{
 		background.setFillColor(color);
 	}
-	void setOutlineColor(sf::Color color)
+	inline void setOutlineColor(sf::Color color)
 	{
 		background.setOutlineColor(color);
 	}
-	void setTextColor(sf::Color color)
+	inline void setTextColor(sf::Color color)
 	{
 		toDraw.setFillColor(color);
 	}
-	void setBarColor(sf::Color color)
+	inline void setBarColor(sf::Color color)
 	{
 		bar.setFillColor(color);
+	}
+	inline sf::Color getBarColor()
+	{
+		return bar.getFillColor();
 	}
 	void setScrollBarSize(float n)
 	{
@@ -406,6 +419,7 @@ public:
 		h = h + scrollBarSize - n;
 		scrollBarSize = n;
 
+		view.reset({0, 0, w, h});
 		view.setViewport(sf::FloatRect(x / win->getSize().x, y / win->getSize().y,
 			w / win->getSize().x, h / win->getSize().y));
 
@@ -423,6 +437,10 @@ public:
 
 		scrollX.setPos({ x, y + h });
 		scrollY.setPos({ x + w, y });
+	}
+	inline sf::Vector2f getPos()
+	{
+		return { x, y };
 	}
 	void write(sf::String str, int tx = -1, int ty = -1)
 	{
@@ -450,7 +468,7 @@ public:
 		return;
 	}
 
-	std::vector<sf::String> getText()
+	inline std::vector<sf::String> getText()
 	{
 		return text;
 	}
@@ -481,7 +499,7 @@ public:
 	{
 		
 	}
-	void Lock(bool b)
+	inline void Lock(bool b)
 	{
 		lock = b;
 	}
@@ -620,8 +638,8 @@ private:
 		}
 
 		//draw first
+		select_highlight.setSize({ getTextWidth(begin.x, begin.y, text[begin.y].getSize() - begin.x), line_height});
 		select_highlight.setPosition({ getTextWidth(0, begin.y, begin.x), begin.y * line_height });
-		select_highlight.setSize({ getTextWidth(begin.x, begin.y, end.x - begin.x), line_height });
 		win->draw(select_highlight);
 
 		//draw between
@@ -638,9 +656,9 @@ private:
 		win->draw(select_highlight);
 
 	}
-	std::vector<sf::Vector3<int>> getSelectedText()
+	std::vector<sf::Vector3i> getSelectedText()
 	{
-		std::vector<sf::Vector3<int>> v;
+		std::vector<sf::Vector3i> v;
 
 		if (select_begin == select_end) return v;
 
@@ -760,56 +778,35 @@ private:
 		if (multiple_lines)
 		{
 			max_width = 0;
-			for (sf::String str : text)
+			for (int i = 0; i < text.size(); i++)
 			{
-				toDraw.setString(str);
-				if (max_width < toDraw.getLocalBounds().width + toDraw.getLocalBounds().left)
-					max_width = toDraw.getLocalBounds().width + toDraw.getLocalBounds().left;
+				float temp = getTextWidth(0, i, text[i].getSize());
+				if (max_width < temp) max_width = temp;
 			}
-		}
+		} else max_width = getTextWidth(0, 0, text[0].getSize());
+		//check width
+		float width = getTextWidth(0, py, px) + bar.getSize().x;
+		if (width <= view.getSize().x) view.setCenter(view.getSize().x * 0.5f, view.getCenter().y);
 		else
 		{
-			toDraw.setString(text[0]);
-			max_width = toDraw.getLocalBounds().width + toDraw.getLocalBounds().left;
+			if (max_width > view.getSize().x && max_width < (view.getCenter().x + view.getSize().x * 0.5f))
+				view.setCenter({ max_width - view.getSize().x * 0.5f, view.getCenter().y });	//wrap
+			if (width > (view.getCenter().x + view.getSize().x * 0.5f))
+				view.move({ width - view.getCenter().x - view.getSize().x * 0.5f, 0.f });		//scroll right
+			if (width < (view.getCenter().x - view.getSize().x * 0.5f))
+				view.move({ width - (view.getCenter().x - view.getSize().x * 0.5f), 0 });		//scroll left
 		}
-
-		//check width
-		float width = getTextWidth(0, py, px);
-
-		if (max_width > w && max_width < (view.getCenter().x + w * 0.5f))	//wrap
-		{
-			view.setCenter({ max_width - w * 0.5f - bar.getSize().x, view.getCenter().y });
-		}
-		if (width > (view.getCenter().x + w * 0.5f))						 //scroll right
-		{
-			view.move({ width - view.getCenter().x - w * 0.5f + bar.getSize().x, 0.f });
-		}
-		if (width < (view.getCenter().x - w * 0.5f))						 //scroll left
-		{
-			view.move({ width - (view.getCenter().x - w * 0.5f) - bar.getSize().x, 0});
-		}
-		if (max_width < w)
-		{
-			view.setCenter({ w * 0.5f, view.getCenter().y });
-		}
-
 		//check height
 		float height = (py + 1) * line_height;
-		if (height > (view.getCenter().y + h * 0.5f))				  //scroll down
-		{
-			view.move({ 0, height - (view.getCenter().y + h * 0.5f) });
-		}
-		if ((py * line_height) < (view.getCenter().y - h * 0.5f))	  //scroll up
-		{
-			view.move({ 0, (py * line_height) - (view.getCenter().y - h * 0.5f) });
-		}
-
+		if (height > (view.getCenter().y + h * 0.5f))				  
+			view.move({ 0, height - (view.getCenter().y + h * 0.5f) });							//scroll down
+		if ((py * line_height) < (view.getCenter().y - h * 0.5f))	  
+			view.move({ 0, (py * line_height) - (view.getCenter().y - h * 0.5f) });				//scroll up
 		//update bar position
-		bar.setPosition({ width, py * line_height});
-
+		bar.setPosition({ width - bar.getSize().x, py * line_height});
 		//update background pos
-		background.setPosition({ view.getCenter().x - w * 0.5f, view.getCenter().y - h * 0.5f });
-
+		background.setPosition({ view.getCenter().x - view.getSize().x * 0.5f, view.getCenter().y - view.getSize().y * 0.5f });
+		//update scrollbar size and pos
 		scrollX.update(max_width);
 		scrollY.update(line_height * text.size());
 	}
@@ -829,7 +826,7 @@ private:
 		res.push_back(s);
 		return res;
 	}
-
+	
 	std::vector<sf::String> divide(sf::String s)
 	{
 		std::vector<sf::String> v;
@@ -874,18 +871,6 @@ private:
 		if (str != "")v.push_back(str);
 
 		return v;
-	}
-
-	sf::String toString(int n)
-	{
-		if (n == 0) return "0";
-		sf::String str = "";
-		while (n > 0)
-		{
-			str = (char)(n % 10 + 48) + str;
-			n /= 10;
-		}
-		return str;
 	}
 
 	float getTextWidth(int sx, int sy, int n)
