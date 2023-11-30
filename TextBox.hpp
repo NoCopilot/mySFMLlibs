@@ -129,7 +129,7 @@ public:
 			//update background pos
 			background.setPosition({ view.getCenter().x - w * 0.5f, view.getCenter().y - h * 0.5f });
 		}
-		if (e.type == sf::Event::KeyPressed)
+		if (editable && e.type == sf::Event::KeyPressed)
 		{
 			if (e.key.code == sf::Keyboard::Delete)
 			{
@@ -203,12 +203,18 @@ public:
 		}
 		if (e.type == sf::Event::TextEntered)
 		{
+			if (!editable)
+			{
+				if (e.text.unicode == 3) goto copy;
+				return;
+			}
 			switch (e.text.unicode)
 			{
 				case 3:
 				case 24:
 				{
 					//copy
+				copy: {}
 					std::vector<sf::Vector3i> v = getSelectedText();
 					if (v.size() == 0) break;
 
@@ -218,6 +224,8 @@ public:
 						toCopy += text[v[i].x].substring(v[i].y, v[i].z) + "\n";
 					toCopy += text[v[v.size() - 1].x].substring(v[v.size() - 1].y, v[v.size() - 1].z);
 					sf::Clipboard::setString(toCopy);
+
+					if (!editable) return;
 
 					//if ctrl + x
 					if (e.text.unicode == 24) deleteSelected();
@@ -503,6 +511,10 @@ public:
 	{
 		lock = b;
 	}
+	inline void setEditable(bool b)
+	{
+		editable = b;
+	}
 private:
 
 	/*----------Variables----------*/
@@ -543,7 +555,7 @@ private:
 	sf::RenderWindow* win;
 	sf::View view;
 	float x = 0, y = 0, w = 0, h = 0;
-	bool focus = false, lostfocus = false, lock = false;
+	bool focus = false, lostfocus = false, lock = false, editable = true;
 	sf::RectangleShape background;
 	/*----------Functions----------*/
 	void singleLinesRender()
@@ -820,8 +832,9 @@ private:
 			if ((char)str[i] == del) {
 				res.push_back(s);
 				s = "";
+				continue;
 			}
-			else s += str[i];
+			s += str[i];
 		}
 		res.push_back(s);
 		return res;
